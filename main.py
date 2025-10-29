@@ -1,38 +1,27 @@
 from sklearn import cluster as cl
-from tifffile import TiffFile
+from tifffile import TiffFile, imwrite, imread
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.axis import Axis
 
+with TiffFile('./data/cb_raw_image_103_cubert_4.tif') as tiff:
+    im_data = tiff.asarray()
+    n_chan = im_data.shape[0]
+    im_size_x = im_data.shape[1]
+    im_size_y = im_data.shape[2]
 
-# with TiffFile('./data/cb_raw_image_103_cubert_4.tif') as tiff:
-#     X = tiff.asarray().reshape((16384, 106))
-#     print(X)
-    # clusters = cl.k_means(X, n_clusters=4)
-    # print(clusters)
+    X = im_data.reshape(n_chan, im_size_x*im_size_y).transpose()
+    
+    centroids, labels, inertia = cl.k_means(X, n_clusters=4)
+    
+    color_map = np.zeros((im_size_x*im_size_y, 3))
 
-X = np.array([
-    [[1, 2, 3],
-     [4, 5, 6],
-     [7, 8, 9]],
-    [[1, 2, 3],
-     [4, 5, 6],
-     [7, 8, 9]],
-    [[1, 2, 3],
-     [4, 5, 6],
-     [7, 8, 9]],
-     ])
+    fig, axs = plt.subplots(nrows=1, ncols=2)
 
-print(f"Original: {X.shape}\n{X}")
+    axs[0].imshow(im_data[50])
+    axs[0].set_title("Raw Cubert Image")
+    
+    axs[1].imshow(labels.reshape(im_size_x, im_size_y))
+    axs[1].set_title("K Means Segmentation")
 
-Xr1 = X.reshape((3, 9))
-print(f"Reshaped (3,9):\n{Xr1}")
-
-Xr2 = X.reshape((9, 3))
-print(f"Reshaped (9,3):\n{Xr2}")
-
-Xr1T = Xr1.transpose()
-print(f"Xr1T Transposed:\n{Xr1T}")
-
-# FINAL OPERATION:
-X = X # Suppose X is the HSI image with shape (3, 3, 3)
-pix = X.reshape(3, 9).transpose() # Three is the number of channels, while 9 is the number of spectral samples in each channel
-print(pix)
+    plt.show()
