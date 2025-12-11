@@ -1,8 +1,19 @@
 import numpy as np
 import json
-from pathlib import Path
 from collections import defaultdict
+import glob
+import os
+import tifffile
 from PIL import Image
+from matplotlib.image import imsave
+
+IMG_SIZE = 410
+LABELS = {
+    "Beef": 1,
+    "Chicken": 2,
+    "Turkey": 3,
+    "Pork": 4
+}
 
 class LSC:
     '''
@@ -66,7 +77,6 @@ class LSC:
         """from LS annotation to {"tag_name + label_name": [numpy uint8 image (width x height)]}"""
         layers = {}
         counters = defaultdict(int)
-        print(len(results))
         for result in results:
             key = (
                 "brushlabels"
@@ -81,7 +91,7 @@ class LSC:
             width = result["original_width"]
             height = result["original_height"]
             labels = result["value"][key]
-            name = from_name + "-" + "-".join(labels)
+            name = "".join(labels)
 
             # result count
             i = str(counters[name])
@@ -90,37 +100,48 @@ class LSC:
 
             image = LSC.decode_rle(rle)
             layers[name] = np.reshape(image, [height, width, 4])[:, :, 3]
-        return layers
+        return layers 
 
-class LSTask:
-    id: int = 0
-    width: int = 0
-    height: int = 0
-    rle: list[tuple[list[int], str]] = []
-    task_id: int = 0
-    image_file: Path
-
-    def __init__(self, json_dict: dict):
-        self.id = json_dict["id"]
-        results = json_dict["result"]
-        for r in results:
-            self.width = r["original_width"]
-            self.height = r["original_height"]
-            value = r["value"]
-            self.rle.append((value["rle"], value["brushlabels"][0]))
-        
-
-def load_image_pair (json_file: str) -> tuple[np.ndarray, np.ndarray]:
+def load_image_pair (json_file: str, root_dir: str) -> tuple[np.ndarray, np.ndarray]:
     '''
     Loads a JSON representation of the images
     '''
+    def get_tiff_ver (col_file_name):
+        return col_file_name.replace(".png", ".tif").replace("colorized", "ground-truth")
+    
+    labels = np.zeros(IMG_SIZE*IMG_SIZE)
+    pixels = np.zeros((IMG_SIZE*IMG_SIZE, 106))
+
     with open(json_file) as fp:
         task_json = json.load(fp)
         layers = LSC.decode_from_annotation("tag", task_json["result"])
-        for layer_name, arr in layers.items():
-            Image.fromarray(arr).save(f"{layer_name}.png")
+        task = task_json["task"]
+        col_file = task["data"]["image"].replace("/data/local-files/?d=", "")
+        hsi_file = os.path.join(root_dir, get_tiff_ver(col_file))
+        hsi_arr = tifffile.imread(hsi_file)
+        if hsi_arr.shape == (106, IMG_SIZE, IMG_SIZE):
+            for y in range(IMG_SIZE):
+                for x in range(IMG_SIZE):
+                    pixels[y*IMG_SIZE + x] = hsi_arr[:, y, x]
+            for layer_name, arr in layers.items():
+                for y in range(IMG_SIZE):
+                    for x in range(IMG_SIZE):
+                        if arr[y][x] != 0:
+                            label_name = layer_name.split("-")[0]
+                            labels[y*IMG_SIZE + x] = LABELS[label_name]
+        
+
+            return labels, pixels
+        else:
+            print("INCORRECT SIZE. SKIPPING")
+            return None, None
 
 def main ():
-    load_image_pair("/home/matthew-morales/LabelStudioData/TissueClassificationData/masks/3")
+    files = glob.glob("/home/matthew-morales/LabelStudioData/TissueClassificationData/masks/*")
+    for i, file in enumerate(files):
+        labels, pixels = load_image_pair(file, "/home/matthew-morales/LabelStudioData")
+        if labels is not None and np.any(labels):
+            file_name = file.split("/")[-1]
+            imsave(f"./test/{file_name}.png", labels.reshape(IMG_SIZE, IMG_SIZE)/3)
 
 main()  
