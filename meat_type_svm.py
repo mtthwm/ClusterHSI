@@ -4,16 +4,17 @@ from collections import defaultdict
 import glob
 import os
 import tifffile
-from PIL import Image
-from matplotlib.image import imsave
+from datetime import datetime
 
-IMG_SIZE = 410
+IMG_SIZE = 352
 LABELS = {
     "Beef": 1,
     "Chicken": 2,
     "Turkey": 3,
     "Pork": 4
 }
+LABEL_STUDIO_ROOT = "/home/matthew-morales/LabelStudioData"
+DATASET_NAME = "MeatSegmentation"
 
 class LSC:
     '''
@@ -137,11 +138,22 @@ def load_image_pair (json_file: str, root_dir: str) -> tuple[np.ndarray, np.ndar
             return None, None
 
 def main ():
-    files = glob.glob("/home/matthew-morales/LabelStudioData/TissueClassificationData/masks/*")
+    files = glob.glob(os.path.join(LABEL_STUDIO_ROOT, DATASET_NAME, "train/masks/*"))
+    pixel_num = IMG_SIZE*IMG_SIZE*len(files)
+    all_pixels = np.zeros((pixel_num, 106), dtype=np.uint16)
+    all_labels = np.zeros(pixel_num)
     for i, file in enumerate(files):
-        labels, pixels = load_image_pair(file, "/home/matthew-morales/LabelStudioData")
+        labels, pixels = load_image_pair(file, LABEL_STUDIO_ROOT)
         if labels is not None and np.any(labels):
             file_name = file.split("/")[-1]
-            imsave(f"./test/{file_name}.png", labels.reshape(IMG_SIZE, IMG_SIZE)/3)
+            IMGSQ = IMG_SIZE*IMG_SIZE
+            for j in range(0, IMGSQ):
+                idx = i*IMGSQ+j
+                all_pixels[idx] = pixels[j]
+                all_labels[idx] = labels[j]
+
+    id = datetime.now().strftime("%m%d%H%M")
+    np.save(f"spectra-{DATASET_NAME}-{id}", all_pixels)
+    np.save(f"labels-{DATASET_NAME}-{id}", all_labels)
 
 main()  
