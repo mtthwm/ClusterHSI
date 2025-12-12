@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.image import imsave
 import random
 
-IMG_SIZE = 192
+CROP_SIZE = 128
 NUM_BANDS = 106
 LABELS = {
     "Beef": 1,
@@ -20,7 +20,10 @@ LABELS = {
 LABEL_STUDIO_ROOT = "/home/matthew-morales/LabelStudioData"
 DATASET_NAME = "MeatSegmentation"
 WAVELENGTHS = np.linspace(450, 850, NUM_BANDS)
-CROP_OFFSET = (60, 133)
+CROP_OFFSET = (88, 179)
+DOWNSAMPLE_FACTOR = 4
+DEBUG = True
+IMG_SIZE = CROP_SIZE // DOWNSAMPLE_FACTOR
 
 class LSC:
     '''
@@ -125,19 +128,20 @@ def load_image_pair (json_file: str, root_dir: str) -> tuple[np.ndarray, np.ndar
         task = task_json["task"]
         col_file = task["data"]["image"].replace("/data/local-files/?d=", "")
         hsi_file = os.path.join(root_dir, get_tiff_ver(col_file))
-        hsi_arr = tifffile.imread(hsi_file)[:,CROP_OFFSET[1]:CROP_OFFSET[1]+IMG_SIZE,CROP_OFFSET[0]:CROP_OFFSET[0]+IMG_SIZE]
+        full_hsi_arr = tifffile.imread(hsi_file)[:,CROP_OFFSET[1]:CROP_OFFSET[1]+CROP_SIZE,CROP_OFFSET[0]:CROP_OFFSET[0]+CROP_SIZE]
+        hsi_arr = full_hsi_arr[:, ::DOWNSAMPLE_FACTOR, ::DOWNSAMPLE_FACTOR]
         if hsi_arr.shape == (106, IMG_SIZE, IMG_SIZE):
             for y in range(IMG_SIZE):
                 for x in range(IMG_SIZE):
                     pixels[y*IMG_SIZE + x, :] = hsi_arr[:, y, x]
-            for layer_name, arr in layers.items():
-                for yi in range(IMG_SIZE):
-                    for xi in range(IMG_SIZE):
-                        y = yi + CROP_OFFSET[1]
-                        x = xi + CROP_OFFSET[0]
+            for layer_name, full_arr in layers.items():
+                arr = full_arr[CROP_OFFSET[1]:CROP_OFFSET[1]+CROP_SIZE,CROP_OFFSET[0]:CROP_OFFSET[0]+CROP_SIZE]
+                arr = arr[::DOWNSAMPLE_FACTOR, ::DOWNSAMPLE_FACTOR]
+                for y in range(IMG_SIZE):
+                    for x in range(IMG_SIZE):
                         if arr[y][x] != 0:
                             label_name = layer_name.split("-")[0]
-                            labels[yi*IMG_SIZE + xi] = LABELS[label_name]
+                            labels[y*IMG_SIZE + x] = LABELS[label_name]
         
 
             return labels, pixels
@@ -152,6 +156,9 @@ def main ():
     all_labels = np.zeros(pixel_num)
     for i, file in enumerate(files):
         labels, pixels = load_image_pair(file, LABEL_STUDIO_ROOT)
+        if DEBUG:
+            file_name = file.split("/")[-1]
+            imsave(f"./test/{file_name}.png", labels.reshape(IMG_SIZE, IMG_SIZE))
         if labels is not None and np.any(labels):
             IMGSQ = IMG_SIZE*IMG_SIZE
             for j in range(0, IMGSQ):
