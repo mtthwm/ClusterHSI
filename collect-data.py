@@ -5,8 +5,11 @@ import glob
 import os
 import tifffile
 from datetime import datetime
+import matplotlib.pyplot as plt
+import random
 
 IMG_SIZE = 352
+NUM_BANDS = 106
 LABELS = {
     "Beef": 1,
     "Chicken": 2,
@@ -15,6 +18,7 @@ LABELS = {
 }
 LABEL_STUDIO_ROOT = "/home/matthew-morales/LabelStudioData"
 DATASET_NAME = "MeatSegmentation"
+WAVELENGTHS = np.linspace(450, 850, NUM_BANDS)
 
 class LSC:
     '''
@@ -123,7 +127,7 @@ def load_image_pair (json_file: str, root_dir: str) -> tuple[np.ndarray, np.ndar
         if hsi_arr.shape == (106, IMG_SIZE, IMG_SIZE):
             for y in range(IMG_SIZE):
                 for x in range(IMG_SIZE):
-                    pixels[y*IMG_SIZE + x] = hsi_arr[:, y, x]
+                    pixels[y*IMG_SIZE + x, :] = hsi_arr[:, y, x]
             for layer_name, arr in layers.items():
                 for y in range(IMG_SIZE):
                     for x in range(IMG_SIZE):
@@ -145,7 +149,6 @@ def main ():
     for i, file in enumerate(files):
         labels, pixels = load_image_pair(file, LABEL_STUDIO_ROOT)
         if labels is not None and np.any(labels):
-            file_name = file.split("/")[-1]
             IMGSQ = IMG_SIZE*IMG_SIZE
             for j in range(0, IMGSQ):
                 idx = i*IMGSQ+j

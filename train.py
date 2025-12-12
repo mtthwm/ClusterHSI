@@ -10,11 +10,15 @@ def main ():
     labels = np.load(LABEL_FILE)
 
     X = np.linspace(0, 105, 106)
-
-    for _ in range(10):
-        ridx = random.randint(0, len(spectra))
-        spect = spectra[ridx]    
-        plt.plot(X, spect)
+    
+    count = 0
+    while count < 10:
+        ridx = random.randint(0, len(labels)-1)
+        if labels[ridx] != 0:
+            spect = spectra[ridx]
+            print(labels[ridx]) 
+            plt.plot(X, spect)
+            count += 1
 
     plt.show()
 main()
