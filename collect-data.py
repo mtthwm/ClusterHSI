@@ -156,4 +156,4 @@ def main ():
     np.save(f"spectra-{DATASET_NAME}-{id}", all_pixels)
     np.save(f"labels-{DATASET_NAME}-{id}", all_labels)
 
-main()  
+main()
