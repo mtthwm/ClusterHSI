@@ -6,9 +6,10 @@ import os
 import tifffile
 from datetime import datetime
 import matplotlib.pyplot as plt
+from matplotlib.image import imsave
 import random
 
-IMG_SIZE = 352
+IMG_SIZE = 192
 NUM_BANDS = 106
 LABELS = {
     "Beef": 1,
@@ -19,6 +20,7 @@ LABELS = {
 LABEL_STUDIO_ROOT = "/home/matthew-morales/LabelStudioData"
 DATASET_NAME = "MeatSegmentation"
 WAVELENGTHS = np.linspace(450, 850, NUM_BANDS)
+CROP_OFFSET = (60, 133)
 
 class LSC:
     '''
@@ -123,17 +125,19 @@ def load_image_pair (json_file: str, root_dir: str) -> tuple[np.ndarray, np.ndar
         task = task_json["task"]
         col_file = task["data"]["image"].replace("/data/local-files/?d=", "")
         hsi_file = os.path.join(root_dir, get_tiff_ver(col_file))
-        hsi_arr = tifffile.imread(hsi_file)
+        hsi_arr = tifffile.imread(hsi_file)[:,CROP_OFFSET[1]:CROP_OFFSET[1]+IMG_SIZE,CROP_OFFSET[0]:CROP_OFFSET[0]+IMG_SIZE]
         if hsi_arr.shape == (106, IMG_SIZE, IMG_SIZE):
             for y in range(IMG_SIZE):
                 for x in range(IMG_SIZE):
                     pixels[y*IMG_SIZE + x, :] = hsi_arr[:, y, x]
             for layer_name, arr in layers.items():
-                for y in range(IMG_SIZE):
-                    for x in range(IMG_SIZE):
+                for yi in range(IMG_SIZE):
+                    for xi in range(IMG_SIZE):
+                        y = yi + CROP_OFFSET[1]
+                        x = xi + CROP_OFFSET[0]
                         if arr[y][x] != 0:
                             label_name = layer_name.split("-")[0]
-                            labels[y*IMG_SIZE + x] = LABELS[label_name]
+                            labels[yi*IMG_SIZE + xi] = LABELS[label_name]
         
 
             return labels, pixels
